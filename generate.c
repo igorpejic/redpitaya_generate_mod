@@ -85,13 +85,12 @@ typedef struct {
 } awg_param_t;
  
 /* Forward declarations */
-void synthesize_signal_am(double ampl, double freq, signal_e type, double endfreq,
-                       int32_t *data,
-                       awg_param_t *params);
- 
-void synthesize_signal_fm(double ampl, double freq, signal_e type, double endfreq,
-                       int32_t *data,
-                       awg_param_t *params);
+void synthesize_signal_am(double ampl, double freq, signal_e type,
+        double carrier_freq, double carrier_amp, int32_t *data, awg_param_t *awg);
+
+void synthesize_signal_fm(double ampl, double freq, signal_e type,
+        double carrier_freq, double carrier_amp, int32_t *data,
+        awg_param_t *awg);
  
 void write_data_fpga(uint32_t ch,
                      const int32_t *data,
@@ -105,11 +104,13 @@ void usage() {
         "\n"
         "Usage: %s   channel amplitude frequency <type> <end frequency>\n"
         "\n"
-        "\tchannel     Channel to generate signal on [1, 2].\n"
-        "\tamplitude   Peak-to-peak signal amplitude in Vpp [0.0 - %1.1f].\n"
-        "\tfrequency   Signal frequency in Hz [%2.1f - %2.1e].\n"
-        "\tmodulation frequency        Signal type [sine, sqr, tri, sweep].\n"
-        "\ttype        Modulation type [am, fm].\n"
+        "\tchannel                  Channel to generate signal on [1, 2].\n"
+        "\tamplitude                Peak-to-peak signal amplitude in Vpp [0.0 - %1.1f].\n"
+        "\tfrequency                Signal frequency in Hz [%2.1f - %2.1e].\n"
+        "\tsignal type             Signal type [sine, sqr, tri, sweep.\n"
+        "\tcarrier amplitude        Amplitude of carrier signal in Hz.\n"
+        "\tcarrier frequency        Frequency of carrier signal in Hz.\n"
+        "\tmodulation type          Modulation type [am, fm].\n"
         "\n";
  
     fprintf( stderr, format, g_argv0,
@@ -146,15 +147,17 @@ int main(int argc, char *argv[])
  
     /* Signal frequency argument parsing */
     double freq = strtod(argv[3], NULL);
-    double modulation_freq;
-    modulation_freq = 0;
+    double carrier_amp, carrier_freq;
  
-    if (argc > 4) {
-        modulation_freq = strtod(argv[4], NULL);
+    if (argc > 5) {
+        carrier_amp = strtod(argv[5], NULL);
+    }
+    if (argc > 6) {
+        carrier_freq = strtod(argv[6], NULL);
     }
     int modulation_type = 0;
-    if (argc > 5){
-        if(strcmp(argv[5], "fm") == 0){
+    if (argc > 7){
+        if(strcmp(argv[7], "fm") == 0){
             modulation_type=1;
         }
     }
@@ -186,8 +189,8 @@ int main(int argc, char *argv[])
  
     awg_param_t params;
     /* Prepare data buffer (calculate from input arguments) */
-    if(modulation_type) synthesize_signal_fm(ampl, freq, type, modulation_freq, data, &params);
-    else synthesize_signal_am(ampl, freq, type, modulation_freq, data, &params);
+    if(modulation_type) synthesize_signal_fm(ampl, freq, type, carrier_freq, carrier_amp, data, &params);
+    else synthesize_signal_am(ampl, freq, type, carrier_freq, carrier_amp, data, &params);
  
     /* Write the data to the FPGA and set FPGA AWG state machine */
     write_data_fpga(ch, data, &params);
@@ -207,7 +210,8 @@ int main(int argc, char *argv[])
  * @param awg   Returned AWG parameters.
  *
  */
-void synthesize_signal_am(double ampl, double freq, signal_e type, double endfreq,
+void synthesize_signal_am(double ampl, double freq, signal_e type,
+        double carrier_freq, double carrier_amp,
                        int32_t *data,
                        awg_param_t *awg) {
  
@@ -241,7 +245,7 @@ void synthesize_signal_am(double ampl, double freq, signal_e type, double endfre
        
         /* Sine */
         if (type == eSignalSine) {
-            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n) * cos(2*M_PI*((double)i/(double)n)) * endfreq);
+            data[i] = round((1 + carrier_amp * cos(2*M_PI*((double)i/(double)n)) * carrier_freq) * amp * cos(2*M_PI*(double)i/(double)n));
         }
  
         /* Square */
@@ -295,18 +299,6 @@ void synthesize_signal_am(double ampl, double freq, signal_e type, double endfre
             data[i] = round(-1.0*(double)amp*(acos(cos(2*M_PI*(double)i/(double)n))/M_PI*2-1));
         }
  
-        /* Sweep */
-        /* Loops from i = 0 to n = 16*1024. Generates a sine wave signal that
-           changes in frequency as the buffer is filled. */
-        double start = 2 * M_PI * freq;
-        double end = 2 * M_PI * endfreq;
-        if (type == eSignalSweep) {
-            double sampFreq = c_awg_smpl_freq; // 125 MHz
-            double t = i / sampFreq; // This particular sample
-            double T = n / sampFreq; // Wave period = # samples / sample frequency
-            /* Actual formula. Frequency changes from start to end. */
-            data[i] = round(amp * (sin((start*T)/log(end/start) * ((exp(t*log(end/start)/T)-1)))));
-        }
        
         /* TODO: Remove, not necessary in C/C++. */
         if(data[i] < 0)
@@ -314,7 +306,8 @@ void synthesize_signal_am(double ampl, double freq, signal_e type, double endfre
     }
 }
  
-void synthesize_signal_fm(double ampl, double freq, signal_e type, double endfreq,
+void synthesize_signal_fm(double ampl, double freq, signal_e type,
+        double carrier_freq, double carrier_amp,
                        int32_t *data,
                        awg_param_t *awg) {
  
@@ -348,7 +341,7 @@ void synthesize_signal_fm(double ampl, double freq, signal_e type, double endfre
        
         /* Sine */
         if (type == eSignalSine) {
-            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n + cos(2*M_PI*((double)i/(double)n) * endfreq)));
+            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n + carrier_amp * cos(2*M_PI*((double)i/(double)n) * carrier_freq)));
         }
  
         /* Square */
@@ -405,15 +398,6 @@ void synthesize_signal_fm(double ampl, double freq, signal_e type, double endfre
         /* Sweep */
         /* Loops from i = 0 to n = 16*1024. Generates a sine wave signal that
            changes in frequency as the buffer is filled. */
-        double start = 2 * M_PI * freq;
-        double end = 2 * M_PI * endfreq;
-        if (type == eSignalSweep) {
-            double sampFreq = c_awg_smpl_freq; // 125 MHz
-            double t = i / sampFreq; // This particular sample
-            double T = n / sampFreq; // Wave period = # samples / sample frequency
-            /* Actual formula. Frequency changes from start to end. */
-            data[i] = round(amp * (sin((start*T)/log(end/start) * ((exp(t*log(end/start)/T)-1)))));
-        }
        
         /* TODO: Remove, not necessary in C/C++. */
         if(data[i] < 0)
