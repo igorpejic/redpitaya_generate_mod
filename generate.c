@@ -250,7 +250,7 @@ void synthesize_signal_am(double ampl, double freq, signal_e type,
  
         /* Square */
         if (type == eSignalSquare) {
-            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n));
+            data[i] = round((1 + mod_amp * cos(2*M_PI*((double)i/(double)n)) * mod_freq) * amp * cos(2*M_PI*(double)i/(double)n));
             if (data[i] > 0)
                 data[i] = amp;
             else
@@ -293,12 +293,6 @@ void synthesize_signal_am(double ampl, double freq, signal_e type,
                 data[i] = round(mm * xx + qq);
             }
         }
-       
-        /* Triangle */
-        if (type == eSignalTriangle) {
-            data[i] = round(-1.0*(double)amp*(acos(cos(2*M_PI*(double)i/(double)n))/M_PI*2-1));
-        }
- 
        
         /* TODO: Remove, not necessary in C/C++. */
         if(data[i] < 0)
@@ -346,7 +340,7 @@ void synthesize_signal_fm(double ampl, double freq, signal_e type,
  
         /* Square */
         if (type == eSignalSquare) {
-            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n));
+            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n + mod_amp * cos(2*M_PI*((double)i/(double)n) * mod_freq)));
             if (data[i] > 0)
                 data[i] = amp;
             else
@@ -389,15 +383,6 @@ void synthesize_signal_fm(double ampl, double freq, signal_e type,
                 data[i] = round(mm * xx + qq);
             }
         }
-       
-        /* Triangle */
-        if (type == eSignalTriangle) {
-            data[i] = round(-1.0*(double)amp*(acos(cos(2*M_PI*(double)i/(double)n))/M_PI*2-1));
-        }
- 
-        /* Sweep */
-        /* Loops from i = 0 to n = 16*1024. Generates a sine wave signal that
-           changes in frequency as the buffer is filled. */
        
         /* TODO: Remove, not necessary in C/C++. */
         if(data[i] < 0)
