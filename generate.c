@@ -86,10 +86,10 @@ typedef struct {
  
 /* Forward declarations */
 void synthesize_signal_am(double ampl, double freq, signal_e type,
-        double carrier_freq, double carrier_amp, int32_t *data, awg_param_t *awg);
+        double mod_freq, double mod_amp, int32_t *data, awg_param_t *awg);
 
 void synthesize_signal_fm(double ampl, double freq, signal_e type,
-        double carrier_freq, double carrier_amp, int32_t *data,
+        double mod_freq, double mod_amp, int32_t *data,
         awg_param_t *awg);
  
 void write_data_fpga(uint32_t ch,
@@ -107,9 +107,9 @@ void usage() {
         "\tchannel                  Channel to generate signal on [1, 2].\n"
         "\tamplitude                Peak-to-peak signal amplitude in Vpp [0.0 - %1.1f].\n"
         "\tfrequency                Signal frequency in Hz [%2.1f - %2.1e].\n"
-        "\tsignal type             Signal type [sine, sqr, tri, sweep.\n"
-        "\tcarrier amplitude        Amplitude of carrier signal in Hz.\n"
-        "\tcarrier frequency        Frequency of carrier signal in Hz.\n"
+        "\tsignal type              Signal type [sine, sqr, tri, sweep.\n"
+        "\tmodulating amplitude     Amplitude of modulating signal.\n"
+        "\tmodulating frequency     Frequency of modulating signal in Hz.\n"
         "\tmodulation type          Modulation type [am, fm].\n"
         "\n";
  
@@ -147,13 +147,13 @@ int main(int argc, char *argv[])
  
     /* Signal frequency argument parsing */
     double freq = strtod(argv[3], NULL);
-    double carrier_amp, carrier_freq;
+    double mod_amp, mod_freq;
  
     if (argc > 5) {
-        carrier_amp = strtod(argv[5], NULL);
+        mod_amp = strtod(argv[5], NULL);
     }
     if (argc > 6) {
-        carrier_freq = strtod(argv[6], NULL);
+        mod_freq = strtod(argv[6], NULL);
     }
     int modulation_type = 0;
     if (argc > 7){
@@ -189,8 +189,8 @@ int main(int argc, char *argv[])
  
     awg_param_t params;
     /* Prepare data buffer (calculate from input arguments) */
-    if(modulation_type) synthesize_signal_fm(ampl, freq, type, carrier_freq, carrier_amp, data, &params);
-    else synthesize_signal_am(ampl, freq, type, carrier_freq, carrier_amp, data, &params);
+    if(modulation_type) synthesize_signal_fm(ampl, freq, type, mod_freq, mod_amp, data, &params);
+    else synthesize_signal_am(ampl, freq, type, mod_freq, mod_amp, data, &params);
  
     /* Write the data to the FPGA and set FPGA AWG state machine */
     write_data_fpga(ch, data, &params);
@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
  *
  */
 void synthesize_signal_am(double ampl, double freq, signal_e type,
-        double carrier_freq, double carrier_amp,
+        double mod_freq, double mod_amp,
                        int32_t *data,
                        awg_param_t *awg) {
  
@@ -245,7 +245,7 @@ void synthesize_signal_am(double ampl, double freq, signal_e type,
        
         /* Sine */
         if (type == eSignalSine) {
-            data[i] = round((1 + carrier_amp * cos(2*M_PI*((double)i/(double)n)) * carrier_freq) * amp * cos(2*M_PI*(double)i/(double)n));
+            data[i] = round((1 + mod_amp * cos(2*M_PI*((double)i/(double)n)) * mod_freq) * amp * cos(2*M_PI*(double)i/(double)n));
         }
  
         /* Square */
@@ -307,7 +307,7 @@ void synthesize_signal_am(double ampl, double freq, signal_e type,
 }
  
 void synthesize_signal_fm(double ampl, double freq, signal_e type,
-        double carrier_freq, double carrier_amp,
+        double mod_freq, double mod_amp,
                        int32_t *data,
                        awg_param_t *awg) {
  
@@ -341,7 +341,7 @@ void synthesize_signal_fm(double ampl, double freq, signal_e type,
        
         /* Sine */
         if (type == eSignalSine) {
-            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n + carrier_amp * cos(2*M_PI*((double)i/(double)n) * carrier_freq)));
+            data[i] = round(amp * cos(2*M_PI*(double)i/(double)n + mod_amp * cos(2*M_PI*((double)i/(double)n) * mod_freq)));
         }
  
         /* Square */
