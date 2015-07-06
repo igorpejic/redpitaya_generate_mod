@@ -245,12 +245,12 @@ void synthesize_signal_am(double ampl, double freq, signal_e type,
        
         /* Sine */
         if (type == eSignalSine) {
-            data[i] = round((1 + mod_amp * cos(2*M_PI*((double)i/(double)n)) * mod_freq) * amp * cos(2*M_PI*(double)i/(double)n));
+            data[i] = round((1 + mod_amp * cos(2*M_PI*((double)i/(double)n) * mod_freq)) * amp * cos(2*M_PI*(double)i/(double)n));
         }
  
         /* Square */
         if (type == eSignalSquare) {
-            data[i] = round((1 + mod_amp * cos(2*M_PI*((double)i/(double)n)) * mod_freq) * amp * cos(2*M_PI*(double)i/(double)n));
+            data[i] = round((1 + mod_amp * cos(2*M_PI*((double)i/(double)n) * mod_freq)) * amp * cos(2*M_PI*(double)i/(double)n));
             if (data[i] > 0)
                 data[i] = amp;
             else
